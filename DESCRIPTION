@@ -1,0 +1,21 @@
+Package: flexcm
+Title: Flexible Models for Dispersed Count Data
+Version: 0.0.1.9000
+Authors@R:
+    person(given = "Eduardo",
+           family = "Elias Ribeiro Junior",
+           role = c("aut", "cre"),
+           email = "edujrrib@gmail.com")
+Description: Provide functions to fit flexible count models that can
+  handle equi-, over-, and underdispersion, namely we considered
+  COM-Poisson, Gamma-count, discrete Weibull, generalized Poisson,
+  double Poisson and Poisson-Tweedie models. The normalizing constants
+  for COM-Poisson and double Poisson models are written in C++.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+LinkingTo: 
+    Rcpp
+Imports: 
+    Rcpp
+RoxygenNote: 6.1.1

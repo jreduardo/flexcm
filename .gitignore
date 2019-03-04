@@ -1,0 +1,15 @@
+# Backup/History files
+*~
+.#*
+#*
+.Rhistory
+
+# Rstudio projects
+.Rproj.user
+*.Rproj
+
+# Others
+*.Rout
+*.html
+roteiro*.R
+inst/doc
