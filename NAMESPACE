@@ -2,4 +2,6 @@
 
 export(compute_logk)
 export(compute_logz)
+importFrom(Rcpp,sourceCpp)
+importFrom(stats,pgamma)
 useDynLib(flexcm, .registration = TRUE)
