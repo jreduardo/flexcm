@@ -17,11 +17,12 @@ llcmp <- function(params, X, y) {
   beta <- params[-1]
   # Map the CMP parameters
   eta <- X %*% beta
+  mu <- exp(eta)
   loglambda <- suppressWarnings(
     nu * log(exp(eta) + (nu - 1) / (2 * nu))
   )
   # Get the normalizing constants
-  logz <- compute_logz(loglambda, nu)
+  logz <- compute_logz(loglambda, mu, nu)
   # Compute the loglikelihood
   ll <- sum(y * loglambda - nu * lfactorial(y) - logz)
   return(-ll)
@@ -109,7 +110,6 @@ llgpo <- function (params, X, y) {
 
 #-----------------------------------------------------------------------
 #' @title Negative log-likelihood function from Double Poisson model
-#'
 #' @description TODO: write the likelihood function.
 #' @param params vector of model parameters.
 #' @param X Design matrix related to the mean parameter \eqn{\mu =
@@ -132,4 +132,146 @@ lldpo <- function (params, X, y) {
   ll <- sum(-0.5 * lphi - mu/phi - y + y*ly - lfactorial(y) +
               (y/phi) * (1 + eta - ly) - logk)
   return(-ll)
+}
+
+#-----------------------------------------------------------------------
+#' @title Maximize log-likelihood functions
+#' @param llfun Function thar returns the negative of the log-likelihood
+#'   given \code{params}, \code{X} and \code{y} arguments for some count
+#'   model.
+#' @param X Design matrix.
+#' @param y Vector of observed count data.
+#' @param start Initial parameters
+#' @param method Argument passed to \code{\link[stats]{optim}(...)}.
+#' @param lower Argument passed to \code{\link[stats]{optim}(...)}.
+#' @param upper Argument passed to \code{\link[stats]{optim}(...)}.
+#' @param hessian Argument passed to \code{\link[stats]{optim}(...)}.
+#' @param control Argument passed to \code{\link[stats]{optim}(...)}.
+#' @return A list with estimated parameters and hessian matrix.
+#' @author Eduardo Jr <edujrrib@gmail.com>
+#' @importFrom stats glm.fit poisson optim
+#'
+flexcm_fit <- function(llfun, X, y,
+                       start   = NULL,
+                       method  = c("BFGS",
+                                   "Nelder-Mead",
+                                   "CG",
+                                   "L-BFGS-B",
+                                   "SANN"),
+                       lower   = -Inf,
+                       upper   = Inf,
+                       hessian = TRUE,
+                       control = list()) {
+  #-------------------------------------------
+  # Initial values
+  if (is.null(start)) {
+    model <- glm.fit(x = X, y = y, family = poisson())
+    start <- c("disp" = 0, model$coefficients)
+  } else {
+    if (is.null(names(start)))
+      names(start)  <- c("disp", colnames(X))
+  }
+  #------------------------------------------
+  # Maximization
+  method <- match.arg(method)
+  out <- optim(par = start,
+               fn = llfun,
+               method = method,
+               lower = lower,
+               upper = upper,
+               hessian = hessian,
+               control = control,
+               X = X,
+               y = y)
+  return(out)
+}
+
+#-----------------------------------------------------------------------
+#' @title Fitting flexible count model models
+#' @param formula An object of class "\code{\link[stats]{formula}}"
+#'   describe the model for mean.
+#' @param data An optional data frame containing the variables in the
+#'   model. If not found in data, the variables are taken from
+#'   \code{environment(formula)}.
+#' @param model An character indicating the model used. Options are
+#'   \code{"compoisson"}, \code{"gammacount"}, \code{"discreteweibull"},
+#'   \code{"generalizedpoisson"}, \code{"doublepoisson"}, and
+#'   \code{"poissontweedie"}.
+#' @param ... Arguments to be used by \code{\link{flexcm_fit}}.
+#' @return An object of class \code{cmpreg}.
+#' @author Eduardo Jr <edujrrib@gmail.com>
+#' @importFrom stats model.frame model.matrix model.response setNames
+#' @export
+#'
+flexcm <- function(formula, data, model, ...) {
+  #--------------------------------------------
+  if (missing(data))
+    data <- environment(formula)
+  #-------------------------------------------
+  # Get matrices
+  frame <- model.frame(formula, data)
+  terms <- attr(frame, "terms")
+  X <- model.matrix(terms, frame)
+  y <- model.response(frame)
+  #-------------------------------------------
+  # Get the log-likelihood function
+  llfun <- switch(model,
+                  "compoisson"         = llcmp,
+                  "gammacount"         = llgct,
+                  "discreteweibull"    = lldwe,
+                  "generalizedpoisson" = llgpo,
+                  "doublepoisson"      = lldpo,
+                  "poissontweedie"     = NA,
+                  # Abbreviation
+                  "cmp"                = llcmp,
+                  "gct"                = llgct,
+                  "dwe"                = lldwe,
+                  "gpo"                = llgpo,
+                  "dpo"                = lldpo,
+                  "ptw"                = NA)
+  dname <- switch(model,
+                  "compoisson"         = "log(nu)",
+                  "gammacount"         = "log(alpha)",
+                  "discreteweibull"    = "log(rho)",
+                  "generalizedpoisson" = "sigma",
+                  "doublepoisson"      = "log(phi)",
+                  "poissontweedie"     = "omega",
+                  # Abbreviation
+                  "cmp"                = "log(nu)",
+                  "gct"                = "log(alpha)",
+                  "dwe"                = "log(rho)",
+                  "gpo"                = "sigma",
+                  "dpo"                = "log(phi)",
+                  "ptw"                = "omega")
+  #--------------------------------------------
+  # Optimize
+  details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
+  coefficients <- setNames(details$par, c(dname, colnames(X)))
+  mean_coefficient <- coefficients[-1]
+  disp_coefficient <- coefficients[ 1]
+  vcov <- NULL
+  if ("hessian" %in% names(details))
+    vcov <- solve(details$hessian)
+  #--------------------------------------------
+  # Fitted values
+  fitted <- exp(X %*% mean_coefficient)
+  if (model %in% c("discreteweibull", "dwe"))
+    fitted <- exp(-fitted)
+  #--------------------------------------------
+  # Output
+  out <- list(call = match.call(),
+              model = model,
+              formula = formula,
+              nobs = length(y),
+              df.residual = length(y) - length(details$par),
+              details = details,
+              loglik = -details$value,
+              vcov = vcov,
+              coefficients = coefficients,
+              mean_coefficient = mean_coefficient,
+              disp_coefficient = disp_coefficient,
+              fitted = c(fitted),
+              data = list(X = X, y = y))
+  class(out) <- "flexcm"
+  return(out)
 }
