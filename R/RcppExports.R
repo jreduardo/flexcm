@@ -4,17 +4,18 @@
 #' @title Compute COM-Poisson normalizing constante in log scale
 #' @description Computes the normalizing constant in the log scale
 #'   usign the LogSumExp trick to avoid numerical issues (See details).
-#' @details \code{logspace_add(a, b) = log(exp(a) + exp(b)) = b + log(1 +
-#'   exp(a - b))}, where \code{b > a}.
+#' @details \code{logspace_add(a, b) = log(exp(a) + exp(b)) = b + log(1
+#'   + exp(a - b))}, where \code{b > a}.
 #' @param loglambda A vector of logarithm of the \eqn{\lambda}
 #'   parameter.
+#' @param mu A vector of the \eqn{\mu} parameter.
 #' @param nu A vector of dispersion parameters \eqn{\nu}.
 #' @return The normalizing constant.
 #' @references Wikipedia, LogSumExp. \url{http://rstudio.com}.
 #' @author Eduardo Jr <edujrrib@gmail.com>
 #' @export
-compute_logz <- function(loglambda, nu) {
-    .Call(`_flexcm_compute_logz`, loglambda, nu)
+compute_logz <- function(loglambda, mu, nu) {
+    .Call(`_flexcm_compute_logz`, loglambda, mu, nu)
 }
 
 #' @title Compute Double Poisson normalizing constante in log scale
