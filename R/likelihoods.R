@@ -197,13 +197,18 @@ flexcm_fit <- function(llfun, X, y,
 #'   \code{"compoisson"}, \code{"gammacount"}, \code{"discreteweibull"},
 #'   \code{"generalizedpoisson"}, \code{"doublepoisson"}, and
 #'   \code{"poissontweedie"}.
+#' @param power only for Poisson-Tweedie model
+#'   (\code{model="poissontweedie"}) a value to be used as fixed power
+#'   parameter for Poisson-Tweedie family. Is \code{NULL}, the power
+#'   parameter will be estimated.
 #' @param ... Arguments to be used by \code{\link{flexcm_fit}}.
 #' @return An object of class \code{cmpreg}.
 #' @author Eduardo Jr <edujrrib@gmail.com>
 #' @importFrom stats model.frame model.matrix model.response setNames
+#' @importFrom utils modifyList capture.output
 #' @export
 #'
-flexcm <- function(formula, data, model, ...) {
+flexcm <- function(formula, data, model, power = NULL, ...) {
   #--------------------------------------------
   if (missing(data))
     data <- environment(formula)
@@ -243,35 +248,105 @@ flexcm <- function(formula, data, model, ...) {
                   "gpo"                = "sigma",
                   "dpo"                = "log(phi)",
                   "ptw"                = "omega")
-  #--------------------------------------------
-  # Optimize
-  details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
-  coefficients <- setNames(details$par, c(dname, colnames(X)))
-  mean_coefficient <- coefficients[-1]
-  disp_coefficient <- coefficients[ 1]
-  vcov <- NULL
-  if ("hessian" %in% names(details))
-    vcov <- solve(details$hessian)
-  #--------------------------------------------
-  # Fitted values
-  fitted <- exp(X %*% mean_coefficient)
-  if (model %in% c("discreteweibull", "dwe"))
-    fitted <- exp(-fitted)
-  #--------------------------------------------
-  # Output
-  out <- list(call = match.call(),
-              model = model,
-              formula = formula,
-              nobs = length(y),
-              df.residual = length(y) - length(details$par),
-              details = details,
-              loglik = -details$value,
-              vcov = vcov,
-              coefficients = coefficients,
-              mean_coefficient = mean_coefficient,
-              disp_coefficient = disp_coefficient,
-              fitted = c(fitted),
-              data = list(X = X, y = y))
+  #------------------------------------------
+  # Poisson-Tweedie model (wrap to mcglm::mcglm)
+  if (model %in% c("poissontweedie", "ptw")) {
+    control_default <- list(correct = FALSE,
+                            max_iter = 100,
+                            tol = 1e-04,
+                            method = "chaser",
+                            tuning = .5,
+                            verbose = FALSE)
+    control_algorithm <- control_default
+    control_algorithm <- modifyList(control_default, list(...))
+    if (is.null(power)) {
+      invisible(capture.output(
+        details <- mcglm::mcglm(linear_pred = c(formula),
+                                matrix_pred = list(mcglm::mc_id(data)),
+                                variance = "poisson_tweedie",
+                                link = "log",
+                                data = data,
+                                power_fixed = FALSE,
+                                control_algorithm = control_algorithm)
+      ))
+      power <- details$Covariance[1]
+      attr(power, "fixed") <- FALSE
+      disp_coefficient <- setNames(details$Covariance[-1], dname)
+      vcov <- as.matrix(details$vcov[-ncol(X) - 1, -ncol(X) - 1])
+    } else {
+      pois <- glm.fit(x = X, y = y, family = poisson())
+      details <- mcglm::mcglm(linear_pred = c(formula),
+                              matrix_pred = list(mcglm::mc_id(data)),
+                              variance = "poisson_tweedie",
+                              link = "log",
+                              data = data,
+                              power_fixed = TRUE,
+                              control_initial = list(
+                                "regression" = list(pois$coefficients),
+                                "tau" = list(1),
+                                "power" = list(power),
+                                "rho" = 0))
+      attr(power, "fixed") <- TRUE
+      disp_coefficient <- setNames(details$Covariance, dname)
+      vcov <- as.matrix(details$vcov)
+    }
+    mean_coefficient <- setNames(details$Regression, colnames(X))
+    coefficients <- c(disp_coefficient, mean_coefficient)
+    fitted <- exp(X %*% mean_coefficient)
+    loglik <- NULL
+    # loglik <- _ptwloglik(y = y,
+    #                      mu = fitted,
+    #                      omega = disp_coefficient,
+    #                      power = power)
+    vcov <- vcov[, c(ncol(X) + 1, 1:ncol(X))]
+    vcov <- vcov[c(ncol(X) + 1, 1:ncol(X)), ]
+    dimnames(vcov) <- list(names(coefficients), names(coefficients))
+    out <- list(call = match.call(),
+                model = model,
+                formula = formula,
+                nobs = length(y),
+                df.residual = length(y) - length(coefficients),
+                details = details,
+                loglik = loglik,
+                vcov = vcov,
+                coefficients = coefficients,
+                mean_coefficient = mean_coefficient,
+                disp_coefficient = disp_coefficient,
+                fitted = c(fitted),
+                power = power,
+                data = list(X = X, y = y))
+  } else {
+    #--------------------------------------------
+    # Optimize
+    details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
+    coefficients <- setNames(details$par, c(dname, colnames(X)))
+    mean_coefficient <- coefficients[-1]
+    disp_coefficient <- coefficients[ 1]
+    vcov <- NULL
+    if ("hessian" %in% names(details))
+      vcov <- solve(details$hessian)
+    #--------------------------------------------
+    # Fitted values
+    fitted <- exp(X %*% mean_coefficient)
+    if (model %in% c("discreteweibull", "dwe"))
+      fitted <- exp(-fitted)
+    #--------------------------------------------
+    # Output
+    out <- list(call = match.call(),
+                model = model,
+                formula = formula,
+                nobs = length(y),
+                df.residual = length(y) - length(details$par),
+                details = details,
+                loglik = -details$value,
+                vcov = vcov,
+                coefficients = coefficients,
+                mean_coefficient = mean_coefficient,
+                disp_coefficient = disp_coefficient,
+                fitted = c(fitted),
+                power = power,
+                data = list(X = X, y = y))
+  }
   class(out) <- "flexcm"
   return(out)
 }

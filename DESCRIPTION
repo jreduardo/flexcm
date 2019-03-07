@@ -17,5 +17,8 @@ LazyData: true
 LinkingTo: 
     Rcpp
 Imports: 
-    Rcpp
+    Rcpp,
+    mcglm (>= 0.5.0)
 RoxygenNote: 6.1.1
+Remotes:  
+    wbonat/mcglm
