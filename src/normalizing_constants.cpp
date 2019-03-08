@@ -20,24 +20,18 @@ NumericVector compute_logz(NumericVector loglambda,
                            double nu) {
   // Control loop
   int maxiter = 1e4;
-  double logepsilon = log(1e-8);
+  double logepsilon = log(1e-12);
   // Output vector
   int n = loglambda.size();
   NumericVector out(n);
   // Compute logz
   for (int i = 0; i < n; ++i) {
-    double logz = 0;
-    int index = ceil(mu[i]);
-    // Left side
-    for (int j = 1; j < index; ++j) {
-      double logz_ = j * loglambda[i] - nu * R::lgammafn(j + 1);
+    double logz  = 0;
+    double logz_ = 0;
+    for (int j = 1; j < maxiter; ++j) {
+      logz_ += loglambda[i] - nu * log(j);
       logz = R::logspace_add(logz, logz_);
-      // if (logz_ < logepsilon) break;
-    }
-    for (int j = index; j < maxiter; ++j) {
-      double logz_ = j * loglambda[i] - nu * R::lgammafn(j + 1);
-      logz = R::logspace_add(logz, logz_);
-      if (logz_ < logepsilon) break;
+      if (logz_ - logz < logepsilon) break;
     }
     out[i] = logz;
   }
@@ -64,27 +58,18 @@ NumericVector compute_logk(NumericVector mu,
                            double lphi) {
   // Control loop
   int maxiter = 1e4;
-  double logepsilon = log(1e-8);
+  double logepsilon = log(1e-12);
   // Output vector
   int n = mu.size();
   NumericVector out(n);
   // Compute logz
   for (int i = 0; i < n; ++i) {
     double logk = -lphi/2 - mu[i]/phi;
-    int index = ceil(mu[i]);
-    // Left side
-    for (int j = 1; j < index; ++j) {
+    for (int j = 1; j < maxiter; ++j) {
       double logk_ = -0.5 * lphi - mu[i]/phi - j + j * log(j) -
         R::lgammafn(j + 1) + (j/phi) * (1 + lmu[i] - log(j));
       logk = R::logspace_add(logk, logk_);
-      // if (logk_ < logepsilon) break;
-    }
-    // Right side
-    for (int j = index; j < maxiter; ++j) {
-      double logk_ = -0.5 * lphi - mu[i]/phi - j + j * log(j) -
-        R::lgammafn(j + 1) + (j/phi) * (1 + lmu[i] - log(j));
-      logk = R::logspace_add(logk, logk_);
-      if (logk_ < logepsilon) break;
+      if (logk_ - logk < logepsilon) break;
     }
     out[i] = logk;
   }
