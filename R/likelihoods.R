@@ -257,7 +257,7 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                             method = "chaser",
                             tuning = .5,
                             verbose = FALSE)
-    control_algorithm <- control_default
+    # control_algorithm <- control_default
     control_algorithm <- modifyList(control_default, list(...))
     if (is.null(power)) {
       invisible(capture.output(
@@ -270,9 +270,11 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                                 control_algorithm = control_algorithm)
       ))
       power <- details$Covariance[1]
-      attr(power, "fixed") <- FALSE
+      attr(power, "std_error") <-
+        sqrt(details$vcov[ncol(X) - 1, ncol(X) - 1])
       disp_coefficient <- setNames(details$Covariance[-1], dname)
       vcov <- as.matrix(details$vcov[-ncol(X) - 1, -ncol(X) - 1])
+      extra <- 1
     } else {
       pois <- glm.fit(x = X, y = y, family = poisson())
       details <- mcglm::mcglm(linear_pred = c(formula),
@@ -286,26 +288,27 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                                 "tau" = list(1),
                                 "power" = list(power),
                                 "rho" = 0))
-      attr(power, "fixed") <- TRUE
+      attr(power, "std_error") <- NA
       disp_coefficient <- setNames(details$Covariance, dname)
       vcov <- as.matrix(details$vcov)
+      extra <- 0
     }
     mean_coefficient <- setNames(details$Regression, colnames(X))
     coefficients <- c(disp_coefficient, mean_coefficient)
+    nparams <- length(coefficients) + extra
     fitted <- exp(X %*% mean_coefficient)
-    loglik <- NULL
-    # loglik <- _ptwloglik(y = y,
-    #                      mu = fitted,
-    #                      omega = disp_coefficient,
-    #                      power = power)
     vcov <- vcov[, c(ncol(X) + 1, 1:ncol(X))]
     vcov <- vcov[c(ncol(X) + 1, 1:ncol(X)), ]
     dimnames(vcov) <- list(names(coefficients), names(coefficients))
+    loglik <- `_ptw_loglik`(y = y,
+                            mu = fitted,
+                            omega = disp_coefficient,
+                            power = power)
     out <- list(call = match.call(),
                 model = model,
                 formula = formula,
                 nobs = length(y),
-                df.residual = length(y) - length(coefficients),
+                df.residual = length(y) - nparams,
                 details = details,
                 loglik = loglik,
                 vcov = vcov,
@@ -318,7 +321,14 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
   } else {
     #--------------------------------------------
     # Optimize
-    details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
+    if (model %in% c("discreteweibull", "dwe")) {
+      poi <- glm.fit(x = X, y = y, family = poisson())
+      start <- c("disp" = 0, -poi$coefficients)
+      details <- flexcm_fit(llfun = llfun, X = X, y = y,
+                            start = start, ...)
+    } else {
+      details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
+    }
     coefficients <- setNames(details$par, c(dname, colnames(X)))
     mean_coefficient <- coefficients[-1]
     disp_coefficient <- coefficients[ 1]
