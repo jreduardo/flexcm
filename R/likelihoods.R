@@ -274,7 +274,7 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
         sqrt(details$vcov[ncol(X) - 1, ncol(X) - 1])
       disp_coefficient <- setNames(details$Covariance[-1], dname)
       vcov <- as.matrix(details$vcov[-ncol(X) - 1, -ncol(X) - 1])
-      extra <- 1
+      extra <- 1L
     } else {
       pois <- glm.fit(x = X, y = y, family = poisson())
       details <- mcglm::mcglm(linear_pred = c(formula),
@@ -288,10 +288,11 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                                 "tau" = list(1),
                                 "power" = list(power),
                                 "rho" = 0))
+      power <- as.double(power)
       attr(power, "std_error") <- NA
       disp_coefficient <- setNames(details$Covariance, dname)
       vcov <- as.matrix(details$vcov)
-      extra <- 0
+      extra <- 0L
     }
     mean_coefficient <- setNames(details$Regression, colnames(X))
     coefficients <- c(disp_coefficient, mean_coefficient)
@@ -333,8 +334,11 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
     mean_coefficient <- coefficients[-1]
     disp_coefficient <- coefficients[ 1]
     vcov <- NULL
-    if ("hessian" %in% names(details))
+    if ("hessian" %in% names(details)) {
       vcov <- solve(details$hessian)
+      dimnames(vcov) <- list(names(coefficients),
+                             names(coefficients))
+    }
     #--------------------------------------------
     # Fitted values
     fitted <- exp(X %*% mean_coefficient)
