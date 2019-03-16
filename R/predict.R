@@ -94,6 +94,7 @@ predict.flexcm <- function(object,
 #-----------------------------------------------------------------------
 # Fitted method
 #' @rdname flexcm-methods
+#' @export
 #'
 fitted.flexcm <- function(object, ...) {
   object$fitted

@@ -49,8 +49,9 @@ summary.flexcm <- function(object, correlation = FALSE, ...) {
 }
 
 #-----------------------------------------------------------------------
-# Print method for summary COM-Poisson models
+# Print method for summary flexible count models models
 #' @rdname flexcm-methods
+#' @export
 #'
 print.summary.flexcm <- function(x,
                                  digits = max(3L, getOption("digits") - 3L),

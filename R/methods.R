@@ -13,8 +13,11 @@ NULL
 #-----------------------------------------------------------------------
 # Print method
 #' @rdname flexcm-methods
+#' @export
 #'
-print.flexcm <- function(x, digits = max(3L, getOption("digits") - 3L)) {
+print.flexcm <- function(x,
+                         digits = max(3L, getOption("digits") - 3L),
+                         ...) {
   name <- `_get_model_name`(x$model)
   cat(sprintf("\n%s regression models", name), sep = "")
   cat("\nCall:  ",
@@ -46,6 +49,7 @@ print.flexcm <- function(x, digits = max(3L, getOption("digits") - 3L)) {
 #-----------------------------------------------------------------------
 # Get the log-likelihood
 #' @rdname flexcm-methods
+#' @export
 #'
 logLik.flexcm <- function(object, ...) {
   if (!missing(...))
@@ -71,6 +75,7 @@ coef.flexcm <- function(object, ...) {
 #-----------------------------------------------------------------------
 # Get the variance-covariance matrix
 #' @rdname flexcm-methods
+#' @export
 #'
 vcov.flexcm <- function(object, ...) {
   if (!missing(...))
@@ -81,6 +86,7 @@ vcov.flexcm <- function(object, ...) {
 #-----------------------------------------------------------------------
 # Get the design matrices
 #' @rdname flexcm-methods
+#' @export
 #'
 model.matrix.flexcm <- function(object, ...) {
   if (!missing(...))

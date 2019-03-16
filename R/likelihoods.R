@@ -207,7 +207,7 @@ flexcm_fit <- function(llfun, X, y,
 #'   parameter for Poisson-Tweedie family. Is \code{NULL}, the power
 #'   parameter will be estimated.
 #' @param ... Arguments to be used by \code{\link{flexcm_fit}}.
-#' @return An object of class \code{cmpreg}.
+#' @return An object of class \code{flexcm}.
 #' @author Eduardo Jr <edujrrib@gmail.com>
 #' @importFrom stats model.frame model.matrix model.response setNames
 #' @importFrom utils modifyList capture.output
