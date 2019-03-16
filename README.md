@@ -5,6 +5,9 @@
 
 # `flexcm`: Flexible Models for Dispersed Count Data
 
+[![Travis build
+status](https://travis-ci.org/jreduardo/flexcm.svg?branch=master)](https://travis-ci.org/jreduardo/flexcm)
+
 > [Eduardo E. R. Junior](http://leg.ufpr.br/~eduardojr) -
 > <jreduardo@usp.br>, IME-USP
 
