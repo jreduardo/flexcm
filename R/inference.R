@@ -104,6 +104,7 @@ print.summary.flexcm <- function(x,
 }
 
 #-----------------------------------------------------------------------
+#' @name lrtests-flexcm
 #' @title Likelihood ratio tests for nested flexible count models
 #' @param object an object of class \code{flexcm}, a result of call
 #'   \code{\link{flexcm}(...)}.
@@ -116,7 +117,7 @@ print.summary.flexcm <- function(x,
 #' @importFrom stats pchisq
 #' @export
 #'
-anova.flexcm <- function(object, ..., heading = TRUE) {
+anova.flexcm <- function(object, ..., heading) {
   dots <- list(...)
   isflexcm <- class(object) == "flexcm"
   #------------------------------------------
@@ -126,7 +127,7 @@ anova.flexcm <- function(object, ..., heading = TRUE) {
   if (!isflexcm & length(dots) == 0) mlist <- object
   if (!isflexcm & length(dots) > 0)  mlist <- c(object, dots)
   if (isflexcm & length(dots)  > 0)  mlist <- c(list(object), dots)
-  # print(str(mlist))
+  if (missing(heading)) heading <- is.null(names(mlist))
   #------------------------------------------
   # Handle the class of the models
   inherits_flexcm <- vapply(mlist, inherits, what = "flexcm", 0L)
@@ -150,14 +151,20 @@ anova.flexcm <- function(object, ..., heading = TRUE) {
   lrs <- c(NA, abs(diff(-2 * lls)))
   dfs <- c(NA, abs(diff(rds)))
   pvs <- pchisq(q = lrs, df = dfs, lower.tail = FALSE)
-  tab <- cbind("AIC"        = aic,
-               "BIC"        = bic,
-               "Resid.df"  = rds,
-               "loglik"     = lls,
-               "Chisq.df"   = dfs,
-               "Chisq"      = lrs,
-               "Pr(>Chisq)" = pvs)
-  rownames(tab) <- sprintf("Model %i", seq(mlist))
+  nam <- if (is.null(names(mlist))) {
+    sprintf("Model %i", seq_along(mlist))
+  } else names(mlist)
+  tab <- data.frame("Model"      = nam,
+                    "AIC"        = aic,
+                    "BIC"        = bic,
+                    "Resid.df"   = rds,
+                    "loglik"     = lls,
+                    "Chisq.df"   = dfs,
+                    "Chisq"      = lrs,
+                    "Pr(>Chisq)" = pvs,
+                    check.names = FALSE,
+                    stringsAsFactors = FALSE)
+  rownames(tab) <- NULL
   #--------------------------------------------
   # Heading
   if (heading) {
@@ -165,14 +172,14 @@ anova.flexcm <- function(object, ..., heading = TRUE) {
       typeof(attr(x$power, "std_error")), "")
     if (!all(diffpower[1] == diffpower)) {
       powers <- vapply(mlist, function(x) x$power, 0)
-      heading <- paste(sprintf("  Model %s (power=%.2f): %s",
-                               seq_along(mlist),
+      heading <- paste(sprintf("  %s (power=%.2f): %s",
+                               format(nam),
                                powers,
                                forms),
                        collapse = "\n")
     } else {
-      heading <- paste(sprintf("  Model %s: %s",
-                               seq_along(mlist),
+      heading <- paste(sprintf("  %s: %s",
+                               format(nam),
                                forms),
                        collapse = "\n")
     }
@@ -180,9 +187,157 @@ anova.flexcm <- function(object, ..., heading = TRUE) {
     heading <- NULL
   }
   name <- `_get_model_name`(mnames[1L])
-  attr(tab, "heading") <- paste0(
-    sprintf("\nLikelihood ratio test for %s", name),
-    " regression models", "\n\n",  heading, "\n")
-  class(tab) <- "anova"
+  attr(tab, "name") <- name
+  attr(tab, "heading") <- heading
+  class(tab) <- c("anova.flexcm", "data.frame")
   return(tab)
+}
+
+#' @rdname lrtests-flexcm
+#' @export
+anova.list <- function(object, ..., heading) {
+  out <- anova.flexcm(object, ..., heading = heading)
+  return(out)
+}
+
+#' @export
+print.anova.flexcm <- function(x,
+                               digits = max(getOption("digits") - 2L, 3L),
+                               signif.stars = getOption("show.signif.stars"),
+                               ...) {
+  name <- attr(x, "name")
+  heading <- attr(x, "heading")
+  cat(sprintf("\nLikelihood ratio test for %s", name),
+      "regression models", "\n\n")
+  if (!is.null(heading)) {
+    cat(heading, "\n\n")
+  }
+  xx <- x
+  rownames(xx) <- x$Model
+  printCoefmat(xx[, -1],
+               cs.ind = NA,
+               tst.ind = c(3L, 5L),
+               zap.ind = 7L,
+               na.print = "",
+               digits = digits,
+               signif.stars = signif.stars)
+  invisible(x)
+}
+
+#' @export
+#' @rdname lrtests-flexcm
+lrtest <- function (object, ..., heading) {
+  UseMethod("anova", object)
+}
+
+#-----------------------------------------------------------------------
+#' @title Likelihood ratio test for equidispersion
+#' @param object an object (or a list of objects) of class
+#'   \code{"flexcm"} with a model nested to Poisson (i.e. Com-Poisson,
+#'   Gamma-count, Generalized-Poisson, Double Poisson and
+#'   Poissson-Tweedie).
+#' @param ... possibly, others fitted models (objects of class
+#'   \code{"flexcm"}).
+#' @param heading logical; if \code{TRUE}, the model formulas are
+#'   printed as heading.
+#' @details Note that, when more than one model is passed the models
+#'   \strong{are not compared among themselves}. Here, each model is
+#'   compared to Poisson and them organized in a table.
+#' @author Eduardo Jr <edujrrib@gmail.com>
+#' @export
+#'
+equitest <- function (object, ..., heading) {
+  UseMethod("equitest", object)
+}
+
+#' @export
+equitest.flexcm <- function(object, ..., heading) {
+  dots <- list(...)
+  isflexcm <- class(object) == "flexcm"
+  #------------------------------------------
+  # Organize the list of models
+  if (!isflexcm &  is.null(dots)) mlist <- object
+  if ( isflexcm &  is.null(dots)) mlist <- list(object)
+  if (!isflexcm & !is.null(dots)) mlist <- c(object, dots)
+  if ( isflexcm & !is.null(dots)) mlist <- c(list(object), dots)
+  if (any(!vapply(mlist, inherits, what = "flexcm", 0L)))
+    stop("Not all objects are of class \"flexcm\".")
+  if (missing(heading))
+    heading <- ifelse(length(mlist) == 1,
+                      FALSE,
+                      is.null(names(mlist)))
+  fam <- vapply(mlist, function(x) `_get_model_name`(x$model), "")
+  if ("Discrete Weibull" %in% fam) {
+    stop("Discrete Weibull models are not nested to Poisson.")
+  }
+  #--------------------------------------------
+  lpo <- vapply(mlist, function(x) x$poissonfit$loglik, 0)
+  npo <- vapply(mlist, function(x) length(x$poissonfit$coef), 0L)
+  rds <- vapply(mlist, function(x) x$df.residual, 0L)
+  lls <- vapply(mlist, function(x) x$loglik, 0)
+  obs <- vapply(mlist, function(x) x$nobs, 0L)
+  lrs <- 2 * (lls - lpo)
+  dfs <- obs - rds - npo
+  pvs <- pchisq(q = lrs, df = dfs, lower.tail = FALSE)
+  nam <- if (is.null(names(mlist))) {
+    sprintf("Model %i", seq_along(mlist))
+  } else names(mlist)
+  tab <- data.frame("Family"     = fam,
+                    "Model"      = nam,
+                    "Resid.df"   = rds,
+                    "Loglik"     = lls,
+                    "LRT_stat"   = lrs,
+                    "LRT_df"     = dfs,
+                    "Pr(>LRT_stat)" = pvs,
+                    check.names = FALSE,
+                    stringsAsFactors = FALSE)
+  rownames(tab) <- NULL
+  #--------------------------------------------
+  if (heading) {
+    calls <- vapply(mlist, function(x) deparse(x$call), "")
+    cnames <- paste0("  ", format(nam), ": ")
+    calls <- paste0(cnames, calls)
+    calls <- paste(calls, collapse = "\n")
+  } else {
+    calls <- NULL
+  }
+  attr(tab, "heading") <- calls
+  class(tab) <- c("equitest.flexcm", "data.frame")
+  return(tab)
+}
+
+#' @export
+equitest.list <- function(object, ..., heading) {
+  out <- equitest.flexcm(object, ..., heading = heading)
+  return(out)
+}
+
+#' @export
+print.equitest.flexcm <- function(x,
+                                  digits = max(getOption("digits") - 2L, 3L),
+                                  signif.stars = getOption("show.signif.stars"),
+                                  ...) {
+  xx <- x
+  heading <- attr(x, "heading")
+  cat("\nLikelihood ratio test for equidispersion", "\n\n")
+  if (!is.null(heading)) {
+    if (nrow(x) == 1L) {
+      heading <- gsub("Model 1:", "", heading)
+    }
+    cat(heading, "\n\n")
+  }
+  if (nrow(x) > 1L) {
+    rownames(xx) <- paste(format(x$Family), format(x$Model))
+  } else {
+    rownames(xx) <- format(x$Family)
+  }
+  printCoefmat(xx[, -(1:2)],
+               cs.ind = NA,
+               tst.ind = c(2L, 3L),
+               zap.ind = 5L,
+               na.print = "",
+               digits = digits,
+               signif.stars = signif.stars,
+               ...)
+  invisible(x)
 }
