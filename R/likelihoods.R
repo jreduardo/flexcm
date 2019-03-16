@@ -162,11 +162,15 @@ flexcm_fit <- function(llfun, X, y,
                        upper   = Inf,
                        hessian = TRUE,
                        control = list()) {
+  #------------------------------------------
+  # Poisson baseline
+  mpois <- glm.fit(x = X, y = y, family = poisson())
+  poiss <- list(loglik = -mpois$aic/2 + mpois$rank,
+                coefficients = mpois$coefficients)
   #-------------------------------------------
   # Initial values
   if (is.null(start)) {
-    model <- glm.fit(x = X, y = y, family = poisson())
-    start <- c("disp" = 0, model$coefficients)
+    start <- c("disp" = 0, mpois$coefficients)
   } else {
     if (is.null(names(start)))
       names(start)  <- c("disp", colnames(X))
@@ -174,7 +178,7 @@ flexcm_fit <- function(llfun, X, y,
   #------------------------------------------
   # Maximization
   method <- match.arg(method)
-  out <- optim(par = start,
+  opt <- optim(par = start,
                fn = llfun,
                method = method,
                lower = lower,
@@ -183,6 +187,7 @@ flexcm_fit <- function(llfun, X, y,
                control = control,
                X = X,
                y = y)
+  out <- list(optim = opt, poissonfit = poiss)
   return(out)
 }
 
@@ -251,6 +256,9 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
   #------------------------------------------
   # Poisson-Tweedie model (wrap to mcglm::mcglm)
   if (model %in% c("poissontweedie", "ptw")) {
+    mpois <- glm.fit(x = X, y = y, family = poisson())
+    poiss <- list(loglik = -mpois$aic/2 + mpois$rank,
+                  coefficients = mpois$coefficients)
     control_default <- list(correct = FALSE,
                             max_iter = 100,
                             tol = 1e-04,
@@ -276,7 +284,6 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
       vcov <- as.matrix(details$vcov[-ncol(X) - 1, -ncol(X) - 1])
       extra <- 1L
     } else {
-      pois <- glm.fit(x = X, y = y, family = poisson())
       details <- mcglm::mcglm(linear_pred = c(formula),
                               matrix_pred = list(mcglm::mc_id(data)),
                               variance = "poisson_tweedie",
@@ -284,7 +291,7 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                               data = data,
                               power_fixed = TRUE,
                               control_initial = list(
-                                "regression" = list(pois$coefficients),
+                                "regression" = list(mpois$coefficients),
                                 "tau" = list(1),
                                 "power" = list(power),
                                 "rho" = 0))
@@ -318,18 +325,21 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                 disp_coefficient = disp_coefficient,
                 fitted = c(fitted),
                 power = power,
+                poissonfit = poiss,
                 data = list(X = X, y = y))
   } else {
     #--------------------------------------------
     # Optimize
-    if (model %in% c("discreteweibull", "dwe")) {
-      poi <- glm.fit(x = X, y = y, family = poisson())
-      start <- c("disp" = 0, -poi$coefficients)
+    if (model %in% c("discreteweibull", "dwe") & is.null(list(...)[["start"]])) {
+      mpois <- glm.fit(x = X, y = y, family = poisson())
+      start <- c("disp" = 0, -mpois$coefficients)
       details <- flexcm_fit(llfun = llfun, X = X, y = y,
                             start = start, ...)
     } else {
       details <- flexcm_fit(llfun = llfun, X = X, y = y, ...)
     }
+    poiss   <- details$poissonfit
+    details <- details$optim
     coefficients <- setNames(details$par, c(dname, colnames(X)))
     mean_coefficient <- coefficients[-1]
     disp_coefficient <- coefficients[ 1]
@@ -359,6 +369,7 @@ flexcm <- function(formula, data, model, power = NULL, ...) {
                 disp_coefficient = disp_coefficient,
                 fitted = c(fitted),
                 power = power,
+                poissonfit = poiss,
                 data = list(X = X, y = y))
   }
   class(out) <- "flexcm"
