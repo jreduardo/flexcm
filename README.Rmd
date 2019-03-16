@@ -1,0 +1,130 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r setup, include=FALSE}
+
+options(width = 100, tibble.print_max = 50)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+  )
+
+```
+
+<img src="man/figures/flexcm_hex.png" align="right" height=160/ display="block">
+
+# `flexcm`: Flexible Models for Dispersed Count Data #
+
+> [Eduardo E. R. Junior](http://leg.ufpr.br/~eduardojr) -
+> [jreduardo@usp.br](mailto:jreduardo@usp.br), IME-USP
+
+The `flexcm` package contains functions to fit flexible count models
+that can handle equi-, over-, and underdispersion, namely we consider
+COM-Poisson, Gamma-count, discrete Weibull, generalized Poisson, double
+Poisson and Poisson-Tweedie models^[Poisson-Tweedie models are fitted
+using [`mcglm`][mcglm] package]. The normalizing constant for double
+Poisson and COM-Poisson are written in C++.
+
+Joint work with [Walmes M. Zeviani](www.leg.ufpr.br/~walmes/) and
+[Clarice G.B. Demétrio](http://ce.esalq.usp.br/equipe/clarice-garcia-borges-demetrio).
+
+## Installation
+
+You can install the development version of `flexcm` from
+[GitHub](https://github.com/jreduardo/flexcm) with:
+
+```r
+
+# install.packages("devtools")
+devtools::install_github("jreduardo/flexcm")
+
+```
+
+## Usage and example
+
+Basically, this package implements methods similar to those related to
+glm objects. The main function is `flexcm(..., model)`.
+
+```{r example}
+
+library(flexcm)
+
+# Fit models -----------------------------------------------------------
+
+# Model families
+families <- list("CMP" = "compoisson",
+                 "GCT" = "gammacount",
+                 "DWe" = "discreteweibull",
+                 "GPo" = "generalizedpoisson",
+                 "DPo" = "doublepoisson",
+                 "PTw" = "poissontweedie")
+
+# Fit models
+models <- lapply(families, function(fam) {
+  flexcm(ninsect ~ extract, model = fam, data = sitophilus)
+})
+
+# Methods --------------------------------------------------------------
+
+vapply(models, coef, numeric(5))
+
+vapply(models, logLik, numeric(1))
+
+equitest(models[-3])
+
+print(models[["PTw"]])
+
+# Predict new data -----------------------------------------------------
+
+newdf <- sitophilus[c(21, 31), -2, drop = FALSE]
+purrr::map_dfr(models,
+               .id = "model",
+               .f = predict,
+               newdata = newdf,
+               type = "response",
+               interval = "confidence",
+               augment_data = TRUE)
+
+```
+
+Currently, the methods implemented for `"flexcm"` objects are
+
+```{r methods}
+
+methods(class = "flexcm")
+
+```
+
+## Related projects ##
+
+There are other R packages to deal with COM-Poisson models that have
+somehow contributed to the writing of `flexcm`.
+
+- [`mcglm`][mcglm]: Routines for fitting the multivariate
+  covariance genelralized linear models. Currently, this package is used
+  to fit the Poisson-Tweedie models in `flexcm`.
+- [`DWreg`][DWreg]: Fit Discrete weibull models (allows to model $q$ or
+  $\rho$ parameters).
+- [`gamlss.dist`][gamlss.dist]: Implements (among other) double Poisson
+  and a restrictive generalized Poisson models.
+- [`glmmTMB`][glmmTMB]: Fit (among other) COM-Poisson, under a different
+  mean-parametrization, and generalized Poisson models (includes
+  zero-inflation, dispersion modeling and random effects).
+
+## License ##
+
+The `flexcm` package is licensed under the [GNU General Public
+License, version 3], see file `LICENSE.md`, © 2019 E. E., Ribeiro Jr.
+
+<!------------------------------------------- -->
+<!-- Links -->
+[GNU General Public License, version 3]: https://www.gnu.org/licenses/gpl-3.0.ht
+[mcglm]: https://github.com/wbonat/mcglm
+[DWreg]: https://cran.r-project.org/package=DWreg
+[glmmTMB]: https://github.com/glmmTMB/glmmTMB
+[gamlss.dist]: https://cran.r-project.org/package=gamlss.dist
