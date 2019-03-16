@@ -11,6 +11,8 @@ Description: Provide functions to fit flexible count models that can
   COM-Poisson, Gamma-count, discrete Weibull, generalized Poisson,
   double Poisson and Poisson-Tweedie models. The normalizing constants
   for COM-Poisson and double Poisson models are written in C++.
+Depends:
+    R (>= 2.10)
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
