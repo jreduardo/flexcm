@@ -48,10 +48,11 @@ llgct <- function (params, X, y) {
   alpha_kappa <- alpha * kappa
   alpha_y <- alpha * y
   # Compute the loglikelihood
-  ll <- sum(log(
-    pgamma(1L, shape = alpha_y, rate = alpha_kappa) -
-      pgamma(1L, shape = alpha_y + alpha, rate = alpha_kappa)
-  ))
+  ll <- suppressWarnings(
+    sum(log(
+      pgamma(1L, shape = alpha_y, rate = alpha_kappa) -
+        pgamma(1L, shape = alpha_y + alpha, rate = alpha_kappa)
+    )))
   return(-ll)
 }
 
