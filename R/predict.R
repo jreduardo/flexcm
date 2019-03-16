@@ -70,7 +70,8 @@ predict.flexcm <- function(object,
     out <- cbind(out,
                  out[, "fit"] - qn * ste,
                  out[, "fit"] + qn * ste)
-    if (mname == "Discrete Weibull") out <- out[, c(1, 3, 2)]
+    if (mname == "Discrete Weibull")
+      out <- out[, c(1, 3, 2), drop = FALSE]
     colnames(out) <- c("fit", "lwr", "upr")
   }
   #------------------------------------------
@@ -79,8 +80,8 @@ predict.flexcm <- function(object,
                    "Gamma-count"      = `_compute_mean_gct`,
                    "Discrete Weibull" = `_compute_mean_dwe`,
                    function(eta, dispersion) exp(eta))
-    out <- apply(out, 2, func,
-                 dispersion = object$disp_coefficient)
+    for (j in 1:ncol(out))
+      out[, j] <- func(out[, j], object$disp_coefficient)
   }
   if (augment_data & missingdata)
     warning("Needs 'newdata' for augment data.")
