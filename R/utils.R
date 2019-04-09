@@ -22,7 +22,7 @@
 # Compute the loglikelihood for Poisson-Tweedie models
 `_ptw_loglik` <- function(y, mu, omega, power, npts = 100L) {
   # Conditions
-  if (!(omega >= 0 & (power >= 1 | power <= 0))) {
+  if (!(omega >= 0 & (power >= 1))) {
     ll <- NA
   } else {
     lli <- vapply(seq(mu), function(i)
